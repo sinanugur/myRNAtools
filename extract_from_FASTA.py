@@ -4,6 +4,12 @@ Created on 14/05/2013
 
 @author: suu13
 '''
+
+#prevent sigpipe error
+from signal import signal, SIGPIPE, SIG_DFL
+signal(SIGPIPE,SIG_DFL)
+#########
+
 from __future__ import print_function
 import argparse
 from Bio import SeqIO

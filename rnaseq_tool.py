@@ -201,20 +201,6 @@ def main():
         count_in_chromosomes(args.bam)
 
 
-    """"
-    program_function = {
-        'pairfold': lambda: Pairfold_Execute(args.sRNA, args.targetRNA) if args.gff is not None else Pairfold_Execute_Parallel(
-            args.sRNA, args.targetRNA),
-        'bifold': lambda: bifold_Execute(args.sRNA, args.targetRNA) if args.cpu is None else bifold_Execute_Parallel(
-            args.sRNA, args.targetRNA),
-        'DuplexFold': lambda: DuplexFold_Execute(args.sRNA, args.targetRNA),
-        'RNAup': lambda: RNAup_Execute_Parallel(args.sRNA, args.targetRNA, args.window),
-        'AccessFold': lambda: AccessFold_Execute(args.sRNA, args.targetRNA),
-        }
-
-    program_function[args.program]()
-    """
-
 if __name__ == '__main__':
     Argument_Parser=argparse.ArgumentParser(prog="rnaseq_tool.py")
     Argument_Parser.add_argument('bam',type=str,help="BAM or SAM file.")
