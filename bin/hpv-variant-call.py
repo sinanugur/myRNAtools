@@ -135,5 +135,5 @@ def main():
 
 
 if __name__ == '__main__':
-    arguments = docopt(__doc__, version='Variant caller for HPV project.')
+    arguments = docopt(__doc__, version='0.9')
     main()
