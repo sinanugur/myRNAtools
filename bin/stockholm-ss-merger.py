@@ -58,20 +58,20 @@ Options:
 """
 
 
-def RNA_Structure(RNAalifold):
+def RNA_Structure(RNAalifold): #get RNA structure from RNAaligment file
     R_Text=RNAalifold.read()
     return ((re.search(r"(.*) \(",R_Text)).group(1).strip())
     
     
 
 def SS_Merger(Stockholm,RNAstructure):
-    S_Lines=Stockholm.readlines()
+    stockholm_lines=Stockholm.readlines()
     
     ID=[]
     W_Start=0
     W_Stop=0
     space_count=0
-    for line in S_Lines:
+    for line in stockholm_lines:
         if(line[0]!="#" and len(line.split())==2):
             if(line.split()[0] in ID):
                 print ("#=GC SS_cons" +' '*space_count + RNAstructure[W_Start:W_Stop] +"\n")
@@ -86,7 +86,8 @@ def SS_Merger(Stockholm,RNAstructure):
             print ("#=GC SS_cons" +' '*space_count + RNAstructure[W_Start:] +"\n")
             print (line.strip())
         else:
-            print (line.strip())
+            if line.strip():
+                print (line.strip())
             
 
 

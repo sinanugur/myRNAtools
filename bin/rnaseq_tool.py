@@ -150,7 +150,7 @@ def htseq_feature_count_gff(bam_file,gff_file):
                         else:
                             try:
                                 XS = int(a_read.optional_field('XS'))
-                                AS=int(a_read.optional_field('AS'))
+                                AS = int(a_read.optional_field('AS'))
                                 if arguments['--filter'] and AS >= XS:
                                     counts[f] += 1
                                 elif arguments['--unique'] and AS > XS:
