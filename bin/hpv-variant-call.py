@@ -186,12 +186,13 @@ def hpv_variant_table_create(bam_file,chromosome,reference_filename,start,end,cs
         else:
             pos = function_transformed_position(position)
 
-        if not arguments['--discordant']:
-            print_variant_csv_files(position_counter,chromosome,sequence,position,pos,csv1 if csv1 else sys.stdout)
-        elif not csv2:
-            print_variant_csv_files(discordant_counter,chromosome,sequence, position,pos, csv1 if csv1 else sys.stdout)
-        else:
+        if csv2:
+            print_variant_csv_files(position_counter,chromosome,sequence, position, pos, csv1)
             print_variant_csv_files(discordant_counter,chromosome,sequence,position, pos, csv2 )
+        elif arguments['--discordant']:
+            print_variant_csv_files(discordant_counter,chromosome,sequence,position,pos,csv1 if csv1 else sys.stdout)
+        else:
+            print_variant_csv_files(position_counter,chromosome,sequence,position,pos,csv1 if csv1 else sys.stdout)
 
 
 
