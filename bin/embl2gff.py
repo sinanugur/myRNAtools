@@ -19,18 +19,19 @@ import sys
 
 
 def EMBL2GFF(EMBL):
-    output_format="%s\tEMBL\t%s\t%d\t%d\t.\t%s\t.\t%s"
+    output_format="%s\tEMBL\t%s\t%d\t%d\t.\t%s\t.\t"
     signal.signal(signal.SIGPIPE, signal.SIG_DFL) #broken pipe hatasindan kurtulmak icin yaptim
     with open(EMBL) as EMBL_file:
 
         try:
             records=SeqIO.parse(EMBL_file,"gb")
         except:
-            record=SeqIO.read(EMBL_file,"embl")
+            records=SeqIO.read(EMBL_file,"embl")
 
         for record in records:
             for EMBL_features in record.features:
-                EMBL_qualifiers=str(EMBL_features.qualifiers)[1:-1]
+                #EMBL_qualifiers=str(EMBL_features.qualifiers)[1:-1]
+                EMBL_qualifiers=EMBL_features.qualifiers
                 EMBL_feature_type=EMBL_features.type
                 Seq_Start=int(EMBL_features.location.start) + 1 #embl okuyucusu bir sebeple hep 1 eksik okuyor, bunu duzeltmek icin koydum, dikkat et
                 Seq_End=int(EMBL_features.location.end)
@@ -39,7 +40,10 @@ def EMBL2GFF(EMBL):
                 else:
                     Seq_Strand='+'
                 try:
-                    print (output_format % (record.id,EMBL_feature_type,Seq_Start,Seq_End,Seq_Strand,EMBL_qualifiers))
+                    print (output_format % (record.id,EMBL_feature_type,Seq_Start,Seq_End,Seq_Strand),end="")
+                    for k in EMBL_qualifiers:
+                        print ("%s \"%s\"; " % (k,EMBL_qualifiers[k][0]),end="")
+                    print ('') 
                 except IOError:
                     pass
                  
