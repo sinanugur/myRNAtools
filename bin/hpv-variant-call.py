@@ -112,10 +112,12 @@ def auto_detect_hpv_type_from_file_name(samfile,bam_file):
 
 
 
-def function_position_counter(pileupread,position_counter):
+def function_position_counter(pileupread,position_counter,quality_counter):
     if not pileupread.is_refskip:
         if not pileupread.is_del:
-            position_counter[pileupread.alignment.query_sequence[pileupread.query_position]] += 1
+            base = pileupread.alignment.query_sequence[pileupread.query_position]
+            position_counter[base] += 1
+            quality_counter[base] += pileupread.alignment.query_qualities[pileupread.query_position]
         else:
             position_counter["deletion"] += 1
 
@@ -159,25 +161,26 @@ def hpv_variant_table_create(bam_file,chromosome,reference_filename,start,end,cs
 
 
 
-    print("chr\tposition\treference\tcoverage\tA\tG\tC\tT\tdeletion\tskip",
+    print("chr\tposition\treference\tcoverage\tA\tG\tC\tT\tdeletion\tskip\tqA\tqG\tqC\tqT",
           file= csv1 if csv1 else sys.stdout)
 
 
     if csv2:
-        print("chr\tposition\treference\tcoverage\tA\tG\tC\tT\tdeletion\tskip",
+        print("chr\tposition\treference\tcoverage\tA\tG\tC\tT\tdeletion\tskip\tqA\tqG\tqC\tqT",
           file=csv2)
 
 
     for position in range(start,end):
         position_counter = Counter()
         discordant_counter = Counter()
+        quality_counter = Counter()
         position_coverage= 0
         for pileupcolumn in samfile.pileup(chromosome, position, position+1, truncate=True,max_depth=1000000000):
             position_coverage=pileupcolumn.n
             for pileupread in pileupcolumn.pileups:
-                function_position_counter(pileupread,position_counter)
+                function_position_counter(pileupread,position_counter,quality_counter)
                 if arguments['--discordant'] and (pileupread.alignment.reference_name != pileupread.alignment.next_reference_name):
-                    function_position_counter(pileupread,discordant_counter)
+                    function_position_counter(pileupread,discordant_counter,quality_counter)
 
 
 
@@ -187,26 +190,32 @@ def hpv_variant_table_create(bam_file,chromosome,reference_filename,start,end,cs
             pos = function_transformed_position(position)
 
         if csv2:
-            print_variant_csv_files(position_counter,chromosome,sequence, position, pos, csv1)
-            print_variant_csv_files(discordant_counter,chromosome,sequence,position, pos, csv2 )
+            print_variant_csv_files(position_counter,quality_counter,chromosome,sequence, position, pos, csv1)
+            print_variant_csv_files(discordant_counter,quality_counter,chromosome,sequence,position, pos, csv2 )
         elif arguments['--discordant']:
-            print_variant_csv_files(discordant_counter,chromosome,sequence,position,pos,csv1 if csv1 else sys.stdout)
+            print_variant_csv_files(discordant_counter,quality_counter,chromosome,sequence,position,pos,csv1 if csv1 else sys.stdout)
         else:
-            print_variant_csv_files(position_counter,chromosome,sequence,position,pos,csv1 if csv1 else sys.stdout)
+            print_variant_csv_files(position_counter,quality_counter,chromosome,sequence,position,pos,csv1 if csv1 else sys.stdout)
 
 
 
-def print_variant_csv_files(position_counter,chromosome,sequence,position,pos,where_to_print):
+def print_variant_csv_files(position_counter,quality_counter,chromosome,sequence,position,pos,where_to_print):
 
 
-    print("{chromosome}\t{position}\t{reference}\t{coverage}\t{A}\t{G}\t{C}\t{T}\t{deletion}\t{skip}".format(
+    print("{chromosome}\t{position}\t{reference}\t{coverage}\t{A}\t{G}\t{C}\t{T}\t{deletion}\t{skip}\t{qA:.2f}\t{qG:.2f}\t{qC:.2f}\t{qT:.2f}".format(
         chromosome=chromosome, position=pos,
         reference='NA' if sequence is None else sequence[position],
         coverage=position_counter["A"] + position_counter["G"] + position_counter["C"] + position_counter["T"],
         A=position_counter["A"],
         G=position_counter["G"],
         C=position_counter["C"],
-        T=position_counter["T"], deletion=position_counter["deletion"], skip=position_counter['skip']
+        T=position_counter["T"],
+        deletion=position_counter["deletion"],
+        skip=position_counter['skip'],
+        qA=quality_counter["A"] / (position_counter["A"] +0.000000000001),
+        qG=quality_counter["G"] / (position_counter["G"] +0.000000000001),
+        qC=quality_counter["C"] / (position_counter["C"] +0.000000000001),
+        qT=quality_counter["T"] / (position_counter["T"] +0.000000000001)
         ),file=where_to_print)
 
 
@@ -237,10 +246,10 @@ def fetch_soft_clipped(bam_file,chromosome,start,end,fasta_file,tsv_file):
                         #if i[0] == 4 and i[1] >= 10: #detect soft clipped, 4 is for soft clip
 
 
-                    if match(cigarsoft, read.cigarstring):
+                    if match(cigarsoft, read.cigarstring): #if soft clipping at the beginning
                         size=int(match(cigarsoft, read.cigarstring).group(1))
                         sequence=read.seq[0:size]
-                    else:
+                    else: #if soft clipping at the end
                         size = int(search(cigarsoft, read.cigarstring).group(1))
                         sequence = read.seq[-size:]
 

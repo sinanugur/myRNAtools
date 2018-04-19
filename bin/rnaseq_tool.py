@@ -162,11 +162,11 @@ def htseq_feature_count_gff(bam_file,gff_file):
 
 
 
-    map(lambda i: print ("%s\t%d" % (i,counts[i])), sorted(counts.keys()))
+    #map(lambda i: print ("%s\t%d" % (i,counts[i])), sorted(counts.keys()))
 
 
-    #for id in sorted(counts.keys()):
-    #    print ("%s\t%d" % (id,counts[id]))
+    for id in sorted(counts.keys()):
+        print ("%s\t%d" % (id,counts[id]))
 
     return
 
