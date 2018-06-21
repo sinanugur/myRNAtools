@@ -1,9 +1,8 @@
 #!/usr/bin/env python
 '''
-Created on 16/04/2018
+Created on 23/04/2018
 
-miRmachine walk on tree, parse out node miRNAs
-
+miRmachine main
 
 @author: suu13
 '''
@@ -41,7 +40,7 @@ SOFTWARE.
 
 """
 
-__doc__="""Parse tree to find node miRNAs.
+__doc__="""Merge Stockholm alignments and RNAalifold structure to create a CM file.
 
 Usage:
     miRmachine-tree-parser.py <newick> <keyword>
@@ -73,18 +72,15 @@ def search_tree_for_keyword(newick_file,keyword):
     tree=newick.read(newick_file)
     for node in tree[0].walk():
         if node.name is not None and node.name.find(keyword.strip()) != -1:
-            detect_ancestors(node, ancestors)
-
-            for i in ancestors:
-                print(i)
-
             break
 
+
+    detect_ancestors(node,ancestors)
+
+    for i in ancestors:
+        print (i)
+
     return
-
-
-
-
 
 
 def main():

@@ -1,18 +1,11 @@
 #!/usr/bin/env python
 '''
-Created on 16/04/2018
+Created on Apr 27, 2018
 
-miRmachine walk on tree, parse out node miRNAs
-
-
-@author: suu13
+@author: sium
 '''
-
-from __future__ import print_function
-import re
-from docopt import docopt
-import newick
-
+# Sequence file parse using a GFF file
+# Downloaded sequence file from NCBI
 
 __author__ = 'sium'
 
@@ -41,16 +34,22 @@ SOFTWARE.
 
 """
 
-__doc__="""Parse tree to find node miRNAs.
+from docopt import docopt
+from Bio import SeqIO
+from BCBio import GFF
+
+__doc__="""Convert GFF to FASTA.
+
+
 
 Usage:
-    miRmachine-tree-parser.py <newick> <keyword>
-    miRmachine-tree-parser.py (-h | --help)
-    miRmachine-tree-parser.py --version
+    gff_to_fasta.py <GFF> <FASTA>
+    gff_to_fasta.py (-h | --help)
+    gff_to_fasta.py --version
 
 Arguments:
-    newick                              A newick tree.
-    keyword                             A keyword to gather node miRNAs (e.g. Homo).
+    GFF                                 A GFF file.
+    FASTA                               A FASTA sequence file.
 
 Options:
     -h --help                          Show this screen.
@@ -59,38 +58,21 @@ Options:
 """
 
 
-def detect_ancestors(node,ancestors):
-    if node == None:
-        return
-    else:
-        ancestors.extend([x.strip() for x in node.name.split("_")])
-        detect_ancestors(node.ancestor,ancestors)
 
+def GFF_to_FASTA(gff_file,fasta_file):
 
-def search_tree_for_keyword(newick_file,keyword):
+    with open(gff_file) as gff, open(fasta_file) as fasta:
 
-    ancestors=list()
-    tree=newick.read(newick_file)
-    for node in tree[0].walk():
-        if node.name is not None and node.name.find(keyword.strip()) != -1:
-            detect_ancestors(node, ancestors)
+        seq_dict=SeqIO.to_dict(SeqIO.parse(fasta,"fasta"))
 
-            for i in ancestors:
-                print(i)
-
-            break
-
-    return
-
-
-
-
-
+        for rec in GFF.parse(gff,base_dict=seq_dict):
+            print (rec)
 
 def main():
-    search_tree_for_keyword(arguments['<newick>'],arguments['<keyword>'])
+    GFF_to_FASTA(arguments["<GFF>"],arguments["<FASTA>"])
 
 
 if __name__ == '__main__':
     arguments = docopt(__doc__, version='0.95')
     main()
+

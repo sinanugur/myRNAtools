@@ -105,7 +105,7 @@ def auto_detect_hpv_type_from_file_name(samfile,bam_file):
 
     autodetected_chromosome = list(filter(lambda x: search(hpv_regex,x), samfile.references))  # find HPV chromosome
     
-    print("The contig with the highest coverage is %s for the BAM file, %s " % (autodetected_chromosome[0], bam_file),
+    print("The HPV name detected is %s for the BAM file, %s " % (autodetected_chromosome[0], bam_file),
                           file=sys.stderr)
 
     return (autodetected_chromosome[0])
@@ -131,7 +131,11 @@ def hpv_variant_table_create(bam_file,chromosome,reference_filename,start,end,cs
     samfile = pysam.AlignmentFile(bam_file)
 
     if arguments['--auto']:
-        chromosome = auto_detect_hpv_type_from_file_name(samfile,bam_file)
+
+        try:
+            chromosome = auto_detect_hpv_type_from_file_name(samfile,bam_file)
+        except:
+            chromosome = auto_detect_chromosome_by_coverage(samfile, bam_file)
 
     if reference_filename is None:
         sequence = None
@@ -224,7 +228,12 @@ def fetch_soft_clipped(bam_file,chromosome,start,end,fasta_file,tsv_file):
     samfile = pysam.AlignmentFile(bam_file)
 
     if arguments['--auto']:
-        chromosomes = list(auto_detect_hpv_type_from_file_name(samfile,bam_file))
+
+        try:
+            chromosomes = list(auto_detect_hpv_type_from_file_name(samfile,bam_file))
+        except:
+            chromosomes = list(auto_detect_chromosome_by_coverage(samfile, bam_file))
+
     elif chromosome is None:
         chromosomes = samfile.references
     else:
