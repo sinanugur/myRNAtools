@@ -2,6 +2,7 @@
 
 '''
 Created on 14/05/2013
+Update on 01/02/2019
 
 @author: suu13
 '''
@@ -37,16 +38,16 @@ SOFTWARE.
 
 
 
-_doc_="""Extract selected sequences from a FASTA file
+_doc_="""Extract selected sequences from a FASTA or FASTQ file
 
 Usage:
-    extract_from_FASTA.py --fasta <file> --text <file> [--reverse] [--nonexact]
+    extract_from_FASTA.py --fasta <file> [--text <file>] [--reverse] [--nonexact]
     extract_from_FASTA.py (-h | --help)
     extract_from_FASTA.py --version
 
 
 Arguments:
-    -f <file>, --fasta <file>       A FASTA file of input sequences.
+    -f <file>, --fasta <file>       A FASTA or FASTQ file of input sequences.
     -t <file>, --text <file>        A text file that contains sequence IDs per line.
 
 Options:
@@ -67,57 +68,77 @@ signal(SIGPIPE,SIG_DFL)
 
 from Bio import SeqIO
 from docopt import docopt
+from functools import reduce
+import gzip
+import sys
 
 
+def function_read_text_file(txt_file):
+    
+    if txt_file == None:
+        txt_lines = sys.stdin.readlines()
+    else:
+        with open(txt_file) as txt:
+            txt_lines = txt.readlines()
+    ids = list(filter(None, list(map(lambda x: x.strip(), txt_lines))))  # filter endlines and empty items from the text file
+    return ids
+
+def function_parse_sequence_file(fasta_file):
+    file_sequences_dictionary={}
+    if fasta_file.lower().endswith(".gz"):
+        with gzip.open(fasta_file,"rt") as handle:
+            
+            if True:
+                file_sequences = SeqIO.parse(handle, "fastq")
+            else:
+                file_sequences = SeqIO.parse(handle, "fasta")
+
+            for i in file_sequences:
+                file_sequences_dictionary[i.id] = i
+    else:
+        with open(fasta_file,"r") as handle:
+            if True:
+                file_sequences = SeqIO.parse(fasta_file, "fastq")
+            else:
+                file_sequences = SeqIO.parse(fasta_file, "fasta")
+            
+            for i in file_sequences:
+                file_sequences_dictionary[i.id] = i
+
+    return file_sequences_dictionary
+
+def function_print_output(items_to_print):
+    for item in items_to_print:
+        #print (">%s\n%s" % (item.id,item.seq))
+        SeqIO.write(item,sys.stdout,"fastq")
 
 def keyword_finder_from_fasta_headers_nonexact(txt_file,fasta_file): #function to find nonexact match
-    with open(txt_file) as txt:
-        txt_lines = txt.readlines()
-    ids = filter(None, map(lambda x: x.strip(), txt_lines))  # filter endlines and empty items from the text file
-    file_sequences = SeqIO.parse(fasta_file, "fasta")
-    file_sequences_dictionary={}
 
-    for i in file_sequences:
-        file_sequences_dictionary[i.id] = i
-
+    ids=function_read_text_file(txt_file)
+    file_sequences_dictionary=function_parse_sequence_file(fasta_file)
     if arguments['--reverse']==False: #print the intersection
+        union=list(filter(lambda x: reduce(lambda a,b: a or b,list(map(lambda y: x.find(y) >= 0,ids))),file_sequences_dictionary.keys()))
+        items_to_print=map(lambda x: file_sequences_dictionary.pop(x), union) #pop out the items
+        function_print_output(items_to_print)
 
-        disjoint=filter(lambda x: reduce(lambda a,b: a or b,map(lambda y: x.find(y) >= 0,ids)),file_sequences_dictionary.keys())
-        map(lambda x: file_sequences_dictionary.pop(x), disjoint) #pop out the non intersection items
-        map(lambda i: print (">%s\n%s" % (i,file_sequences_dictionary[i].seq)),file_sequences_dictionary.keys())
-                
     else: #print the non-intersection disjoint
-
-        union=filter(lambda x: not reduce(lambda a,b: a or b,map(lambda y: x.find(y) >= 0,ids)),file_sequences_dictionary.keys())
-        map(lambda x: file_sequences_dictionary.pop(x), union) #pop out the intersection items
-        map(lambda i: print (">%s\n%s" % (i,file_sequences_dictionary[i].seq)),file_sequences_dictionary.keys())
-
+        disjoint=list(filter(lambda x: not reduce(lambda a,b: a or b,list(map(lambda y: x.find(y) >= 0,ids))),file_sequences_dictionary.keys()))
+        items_to_print=map(lambda x: file_sequences_dictionary.pop(x), disjoint) #pop out the intersection items
+        function_print_output(items_to_print)
 
 def keyword_finder_from_fasta_headers(txt_file,fasta_file): #exact match
 
-    with open(txt_file) as txt:
-        txt_lines = txt.readlines()
-    ids = filter(None, map(lambda x: x.strip(), txt_lines))  # filter endlines and empty items from the text file
-
-    file_sequences = SeqIO.parse(fasta_file, "fasta")
-    file_sequences_dictionary={}
-    for i in file_sequences:
-        file_sequences_dictionary[i.id] = i
-
-
+    ids = function_read_text_file(txt_file)
+    file_sequences_dictionary=function_parse_sequence_file(fasta_file)
     if arguments['--reverse']==False: #print the intersection
-
-        disjoint=filter(lambda x:x not in ids,file_sequences_dictionary.keys())
-        map(lambda x: file_sequences_dictionary.pop(x), disjoint) #pop out the items
-        map(lambda i: print (">%s\n%s" % (i,file_sequences_dictionary[i].seq)),file_sequences_dictionary.keys())
+        union=list(filter(lambda x:x in ids,file_sequences_dictionary.keys()))
+        items_to_print=map(lambda x: file_sequences_dictionary.pop(x), union) #pop out the items
+        function_print_output(items_to_print)
 
     else: #print the non-intersection disjoint
-
-        union=filter(lambda x:x in ids,file_sequences_dictionary.keys())
-        map(lambda x: file_sequences_dictionary.pop(x), union) #pop out the intersection items
-        map(lambda i: print (">%s\n%s" % (i,file_sequences_dictionary[i].seq)),file_sequences_dictionary.keys())
-
-
+        disjoint=list(filter(lambda x:x not in ids,file_sequences_dictionary.keys()))
+        items_to_print=map(lambda x: file_sequences_dictionary.pop(x), disjoint)
+        function_print_output(items_to_print)
 
 def main():
 
