@@ -131,9 +131,14 @@ def keyword_finder_from_fasta_headers(txt_file,fasta_file): #exact match
     ids = function_read_text_file(txt_file)
     file_sequences_dictionary=function_parse_sequence_file(fasta_file)
     if arguments['--reverse']==False: #print the intersection
-        union=list(filter(lambda x:x in ids,file_sequences_dictionary.keys()))
-        items_to_print=map(lambda x: file_sequences_dictionary.pop(x), union) #pop out the items
-        function_print_output(items_to_print)
+        #union=list(filter(lambda x:x in ids,file_sequences_dictionary.keys()))
+        #items_to_print=map(lambda x: file_sequences_dictionary.pop(x), union) #pop out the items
+        #function_print_output(items_to_print)
+        for item in ids:
+            try:
+                SeqIO.write(file_sequences_dictionary[item],sys.stdout,"fastq")
+            except:
+                pass
 
     else: #print the non-intersection disjoint
         disjoint=list(filter(lambda x:x not in ids,file_sequences_dictionary.keys()))
