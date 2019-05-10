@@ -37,8 +37,7 @@ SOFTWARE.
 __doc__="""Variant caller for HPV project.
 
 Usage:
-    hpv-variant-call.py <BAM> [<OUTCSV1>] (--chromosome <name> | --auto) [--reference <name>] [--start=<number>] [--end=<number>] [--transformed] [--discordant]
-    hpv-variant-call.py <BAM> <OUTCSV1> <OUTCSV2> --discordant (--chromosome <name> | --auto) [--reference <name>] [--start=<number>] [--end=<number>] [--transformed]
+    hpv-variant-call.py <BAM> [<OUTCSV>] (--chromosome <name> | --auto) [--discordant] [--reference <name>] [--start=<number>] [--end=<number>] [--transformed] [--cpu=<number>]
     hpv-variant-call.py <BAM> <FASTA> <BED> [--chromosome <name> | --auto] [--reference <name>] [--start=<number>] [--end=<number>]
     hpv-variant-call.py (-h | --help)
     hpv-variant-call.py --version
@@ -47,12 +46,12 @@ Arguments:
     BAM                                          BAM or SAM File name.
     FASTA                                        Output FASTA file name for soft clipped sequences.
     BED                                          Output tab-seperated BED file name for soft clipped sequences.
-    OUTCSV1                                      Write regular CSV output into a file, not STDOUT.
-    OUTCSV2                                      If given, write discordant CSV into this file.
+    OUTCSV                                       Write regular CSV output into a file, not STDOUT.
     -c <name>, --chromosome <name>               The name of the chromosome.
     -r <name>, --reference <name>                Reference FASTA file.
     -s <number>, --start <number>                Start position [default : 0]
     -e <number>, --end <number>                  End position
+    -j <number>, --cpu <number>                  The number of CPUs for parallel processing. [default : 1] 
 
 Options:
     -a --auto                          Autodetect chromosome name (with highest coverage) to be fetched. 
@@ -75,7 +74,6 @@ from collections import Counter
 from docopt import docopt
 
 import sys
-import functools
 from math import floor
 
 from Bio import SeqIO
@@ -83,14 +81,16 @@ from Bio.Seq import Seq
 from re import search
 from re import match
 from re import compile
-from joblib import Parallel, delayed
+from pathos.multiprocessing import ProcessPool
+from functools import reduce
+from itertools import repeat
 
 
 def auto_detect_chromosome_by_coverage(samfile,bam_file):
     hpv_chromosomes = list(filter(lambda x: x.find("HPV") >= 0, samfile.references))  # find HPV chromosomes
     the_list_of_chromosome_counts = list(
         map(lambda chr: [chr, samfile.count(chr)], hpv_chromosomes))  # estimate HPV chromosome coverages
-    autodetected_chromosome = functools.reduce(lambda x, y: x if x[1] > y[1] >= 0 else y,
+    autodetected_chromosome = reduce(lambda x, y: x if x[1] > y[1] >= 0 else y,
                                                the_list_of_chromosome_counts)  # find the highest coverage
     print("The contig with the highest coverage is %s for the BAM file, %s " % (autodetected_chromosome[0], bam_file),
           file=sys.stderr)
@@ -127,7 +127,39 @@ def function_position_counter(pileupread,position_counter,quality_counter):
 
 
 
-def hpv_variant_table_create(bam_file,chromosome,reference_filename,start,end,csv1,csv2):
+def function_merge_two_dicts(x, y):
+    """Given two dicts, merge them into a new dict as a shallow copy."""
+    z = x.copy()
+    z.update(y)
+    return(z)
+
+def function_reduce(x,y):
+    return((x[0]+y[0],x[1]+y[1]))
+
+def function_parallel_count(position,bam_file,chromosome):
+    samfile = pysam.AlignmentFile(bam_file)
+
+
+    position_counter = Counter()
+    discordant_counter = Counter()
+    quality_counter = Counter()
+    discordant_quality_counter = Counter()
+
+    if arguments['--discordant']:
+        for pileupcolumn in samfile.pileup(chromosome, position, position + 1, truncate=True, max_depth=1000000000):
+            for pileupread in pileupcolumn.pileups:
+                if (pileupread.alignment.reference_name != pileupread.alignment.next_reference_name):
+                    function_position_counter(pileupread, discordant_counter, discordant_quality_counter)
+    else:
+        for pileupcolumn in samfile.pileup(chromosome, position, position + 1, truncate=True, max_depth=1000000000):
+            for pileupread in pileupcolumn.pileups:
+                function_position_counter(pileupread, position_counter, quality_counter)
+
+    samfile.close()
+    return({position:(position_counter,quality_counter,discordant_counter,discordant_quality_counter)})
+
+
+def hpv_variant_table_create(bam_file,chromosome,reference_filename,start,end,csv1):
 
     samfile = pysam.AlignmentFile(bam_file)
 
@@ -141,10 +173,8 @@ def hpv_variant_table_create(bam_file,chromosome,reference_filename,start,end,cs
     if reference_filename is None:
         sequence = None
 
-
     else:
-        #fastafile= pysam.FastaFile(reference_filename)
-        #sequence = fastafile.fetch(chromosome)
+
 
         for record in SeqIO.parse(reference_filename,"fasta"):
             if record.id == chromosome:
@@ -170,37 +200,25 @@ def hpv_variant_table_create(bam_file,chromosome,reference_filename,start,end,cs
           file= csv1 if csv1 else sys.stdout)
 
 
-    if csv2:
-        print("chr\tposition\treference\tcoverage\tA\tG\tC\tT\tdeletion\tskip\tqA\tqG\tqC\tqT",
-          file=csv2)
 
+    samfile.close()
+    with ProcessPool(int(arguments['--cpu'])) as pool:
+        res = pool.map(function_parallel_count, range(start,end),repeat(bam_file),repeat(chromosome))
+
+
+    results=reduce(function_merge_two_dicts,res)
 
     for position in range(start,end):
-        position_counter = Counter()
-        discordant_counter = Counter()
-        quality_counter = Counter()
-        position_coverage= 0
-        for pileupcolumn in samfile.pileup(chromosome, position, position+1, truncate=True,max_depth=1000000000):
-            position_coverage=pileupcolumn.n
-            for pileupread in pileupcolumn.pileups:
-                function_position_counter(pileupread,position_counter,quality_counter)
-                if arguments['--discordant'] and (pileupread.alignment.reference_name != pileupread.alignment.next_reference_name):
-                    function_position_counter(pileupread,discordant_counter,quality_counter)
-
-
 
         if not arguments['--transformed']:  # is this a shifted genome, no
             pos = position + 1
         else:
             pos = function_transformed_position(position)
 
-        if csv2:
-            print_variant_csv_files(position_counter,quality_counter,chromosome,sequence, position, pos, csv1)
-            print_variant_csv_files(discordant_counter,quality_counter,chromosome,sequence,position, pos, csv2 )
-        elif arguments['--discordant']:
-            print_variant_csv_files(discordant_counter,quality_counter,chromosome,sequence,position,pos,csv1 if csv1 else sys.stdout)
+        if arguments['--discordant']:
+            print_variant_csv_files(results[position][2],results[position][3],chromosome,sequence,position,pos,csv1 if csv1 else sys.stdout)
         else:
-            print_variant_csv_files(position_counter,quality_counter,chromosome,sequence,position,pos,csv1 if csv1 else sys.stdout)
+            print_variant_csv_files(results[position][0],results[position][1],chromosome,sequence,position,pos,csv1 if csv1 else sys.stdout)
 
 
 
@@ -294,19 +312,13 @@ def main():
         fetch_soft_clipped(arguments['<BAM>'],arguments['--chromosome'],arguments['--start'],arguments['--end'],arguments['<FASTA>'],arguments['<BED>'])
     else:
 
-        if arguments['<OUTCSV2>']:
-            with open(arguments["<OUTCSV1>"], "w") as csv1, open(arguments["<OUTCSV2>"], "w") as csv2:
+        if arguments['<OUTCSV>']:
+            with open(arguments["<OUTCSV>"], "w") as csv1:
                 hpv_variant_table_create(arguments['<BAM>'], arguments['--chromosome'], arguments['--reference'],
-                                     arguments['--start'], arguments['--end'], csv1, csv2)
-
-        elif arguments['<OUTCSV1>']:
-            with open(arguments["<OUTCSV1>"], "w") as csv1:
-                hpv_variant_table_create(arguments['<BAM>'], arguments['--chromosome'], arguments['--reference'],
-                                         arguments['--start'], arguments['--end'], csv1, csv2=None)
-
+                                         arguments['--start'], arguments['--end'], csv1)
         else:
             hpv_variant_table_create(arguments['<BAM>'], arguments['--chromosome'], arguments['--reference'],
-                                     arguments['--start'], arguments['--end'], csv1=None, csv2=None)
+                                     arguments['--start'], arguments['--end'], csv1=None)
 
 
 if __name__ == '__main__':
