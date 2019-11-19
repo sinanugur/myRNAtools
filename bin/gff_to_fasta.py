@@ -67,6 +67,7 @@ def GFF_to_FASTA(gff_file,fasta_file):
 
         for rec in GFF.parse(gff,base_dict=seq_dict):
             print (rec)
+            #print (">{}\t{}\n".format(rec.seqid,rec.seq))
 
 def main():
     GFF_to_FASTA(arguments["<GFF>"],arguments["<FASTA>"])

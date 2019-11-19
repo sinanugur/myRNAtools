@@ -39,6 +39,7 @@ _doc_="""Extract selected sequences from a FASTA or FASTQ file
 
 Usage:
     extract_from_FASTA.py --fasta <file> [--text <file>] [--reverse] [--nonexact]
+    extract_from_FASTA.py --fasta <file> --duplicate [--vienna]
     extract_from_FASTA.py (-h | --help)
     extract_from_FASTA.py --version
 
@@ -52,6 +53,8 @@ Options:
     --version                   Show version.
     --reverse                   If this one is ON, remove the sequences with matched IDs and print the rest.
     --nonexact                  Do a non-exact match using find function, by default do an exact match.
+    --duplicate                 Remove duplicated IDs if any.
+    --vienna                    FASTA print in vienna format.
 
 
 """
@@ -160,19 +163,38 @@ def keyword_finder_from_fasta_headers(txt_file,fasta_file): #exact match
         #print(items_to_print)
         for item in items_to_print:
             try:
-                SeqIO.write(item,sys.stdout,"fastq")
+                SeqIO.write(item, sys.stdout,"fastq")
             except:
                 SeqIO.write(item, sys.stdout, "fasta")
 
+
+#19/11/2019
+#remove duplicate ids from FASTA files
+def remove_duplicate_ids(fasta_file):
+    
+    file_sequences_dictionary=my_functions.function_parse_sequence_file(fasta_file)
+    ids=file_sequences_dictionary.keys()
+    items_to_print = file_sequences_dictionary
+    for item in ids:
+        try:
+            SeqIO.write(file_sequences_dictionary[item],sys.stdout,"fastq")
+        except:
+            if(arguments['--vienna']):
+                print(">{id}\n{sequence}".format(id=file_sequences_dictionary[item].description,sequence=file_sequences_dictionary[item].seq))
+            else:
+                SeqIO.write(file_sequences_dictionary[item], sys.stdout, "fasta")
+
 def main():
 
-    if(arguments['--nonexact'] is False):
+    if(arguments['--duplicate'] is True):
+        remove_duplicate_ids(arguments['--fasta'])
+    elif(arguments['--nonexact'] is False):
         keyword_finder_from_fasta_headers(arguments['--text'],arguments['--fasta'])
     else:
         keyword_finder_from_fasta_headers_nonexact(arguments['--text'],arguments['--fasta'])
-
+    
 
 if __name__ == '__main__':
-    arguments = docopt(_doc_, version='A sequence extraction tool from a FASTA file 1.5')
+    arguments = docopt(_doc_, version='A sequence extraction tool from a FASTA file 1.6')
     main()
 
